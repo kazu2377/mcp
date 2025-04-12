@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カテゴリー一覧</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        th {
+            background-color: #f1f3f5;
+            font-weight: bold;
+            color: #495057;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .description {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #6c757d;
+        }
+        .error {
+            color: #dc3545;
+            text-align: center;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .home-link {
+            display: block;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>カテゴリー一覧</h1>
+        <div id="error-container"></div>
+        <div id="loading">データを読み込み中...</div>
+        <table id="category-table">
+            <thead>
+                <tr>
+                    <th>カテゴリー名</th>
+                    <th>説明</th>
+                </tr>
+            </thead>
+            <tbody id="category-list">
+                <!-- JavaScriptでデータが挿入されます -->
+            </tbody>
+        </table>
+        <div class="footer">
+            <p>カテゴリー総数: <span id="category-count">0</span></p>
+            <p>最終更新日: <span id="update-date"></span></p>
+        </div>
+        <a href="index.html" class="home-link">ホームに戻る</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Supabaseの設定
+            const SUPABASE_URL = 'https://bvpqycyyadvcqzkgpqop.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2cHF5Y3l5YWR2Y3F6a2dwcW9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNzY5NTQsImV4cCI6MjA1OTc1Mjk1NH0.cFNdutF1mDkK1IOOUQn1U67Gm5ghPpEkuux_XYvoI0Q';
+            
+            // 現在の日付を表示
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+            document.getElementById('update-date').textContent = dateStr;
+            
+            // カテゴリーデータを取得する関数
+            async function fetchCategories() {
+                try {
+                    // APIが失敗した場合のフォールバックデータ
+                    const staticData = [
+                        { name: "インテリア", description: "家具・インテリア関連商品" },
+                        { name: "ガーデニング", description: "庭園・植物関連商品" },
+                        { name: "キッチン用品", description: "キッチン・調理関連アイテム" },
+                        { name: "スポーツ用品", description: "スポーツ関連商品" },
+                        { name: "書籍", description: "書籍・雑誌" },
+                        { name: "衣類", description: "アパレル商品" },
+                        { name: "電化製品", description: "家電製品全般" },
+                        { name: "食品", description: "食料品全般" }
+                    ];
+                    
+                    const response = await fetch(`${SUPABASE_URL}/rest/v1/categories?select=*&order=name`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Prefer': 'return=representation'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        console.error('API呼び出しに失敗しました:', response.status);
+                        return staticData;
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.length === 0) {
+                        console.warn('APIからデータが取得できませんでした');
+                        return staticData;
+                    }
+                    
+                    return data;
+                } catch (error) {
+                    console.error('エラー:', error);
+                    return staticData; // エラーが発生した場合は静的データを返す
+                }
+            }
+            
+            // カテゴリーデータを表示する関数
+            function displayCategories(categories) {
+                const categoryList = document.getElementById('category-list');
+                categoryList.innerHTML = '';
+                
+                if (categories.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = '<td colspan="2" style="text-align: center;">カテゴリーが見つかりませんでした</td>';
+                    categoryList.appendChild(row);
+                    return;
+                }
+                
+                // カテゴリー数を表示
+                document.getElementById('category-count').textContent = categories.length;
+                
+                // カテゴリーをテーブルに表示
+                categories.forEach(category => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${escapeHtml(category.name)}</td>
+                        <td class="description">${escapeHtml(category.description || '')}</td>
+                    `;
+                    categoryList.appendChild(row);
+                });
+            }
+            
+            // HTMLエスケープ関数
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+            
+            // エラーを表示する関数
+            function displayError(message) {
+                const errorContainer = document.getElementById('error-container');
+                errorContainer.innerHTML = `<div class="error">${message}</div>`;
+            }
+            
+            // アプリの初期化処理
+            async function init() {
+                try {
+                    const categories = await fetchCategories();
+                    document.getElementById('loading').style.display = 'none';
+                    displayCategories(categories);
+                } catch (error) {
+                    document.getElementById('loading').style.display = 'none';
+                    displayError('カテゴリーデータの取得中にエラーが発生しました。後でもう一度お試しください。');
+                }
+            }
+            
+            // アプリを初期化
+            init();
+        });
+    </script>
+</body>
+</html>
